@@ -16,8 +16,15 @@ function initFirebase() {
   }
 
   const saPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  const saJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-  if (saPath) {
+  if (saJson) {
+    const serviceAccount = JSON.parse(saJson);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log('🔥  Firebase initialised with service account JSON');
+  } else if (saPath) {
     // Production / full-access mode
     const serviceAccount = require(saPath);
     admin.initializeApp({
@@ -26,7 +33,7 @@ function initFirebase() {
     console.log('🔥  Firebase initialised with service account');
   } else {
     // Fallback: initialise without credentials (emulator / limited)
-    admin.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || 'stocker-5213e' });
+    admin.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID });
     console.log('🔥  Firebase initialised (no service account — limited mode)');
   }
 

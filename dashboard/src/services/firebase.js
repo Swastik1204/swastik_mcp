@@ -1,6 +1,6 @@
 /**
  * Firebase client config for the dashboard.
- * Uses the Stocker project credentials.
+ * Reads all Firebase values from dashboard/.env.
  */
 
 import { initializeApp } from "firebase/app";
@@ -9,13 +9,13 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC5cPocVlLiZZzzxWZw9Pw1YWSx2o8-d-4",
-  authDomain: "stocker-5213e.firebaseapp.com",
-  projectId: "stocker-5213e",
-  storageBucket: "stocker-5213e.firebasestorage.app",
-  messagingSenderId: "612220870441",
-  appId: "1:612220870441:web:59004cb1a0b995714d6138",
-  measurementId: "G-VELDXXRSX1"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);

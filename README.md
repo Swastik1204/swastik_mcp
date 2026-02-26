@@ -59,7 +59,7 @@ swastik_mcp/
 ### Prerequisites
 - **Node.js** ≥ 18 — [Download](https://nodejs.org/)
 - **Git** — [Download](https://git-scm.com/)
-- **Firebase project** — Already configured (stocker-5213e)
+- **Firebase project**
 
 ### 1. Clone the repo
 
@@ -98,18 +98,25 @@ cd ..
 ```powershell
 # Copy the example env file for the backend
 Copy-Item .env.example backend\.env
+
+# Copy dashboard env template
+Copy-Item dashboard\.env.example dashboard\.env
 ```
 
 Edit `backend\.env` and set:
 - `FIREBASE_SERVICE_ACCOUNT_PATH` — path to your Firebase service account JSON
-- Other values have sensible defaults
+- `FIREBASE_SERVICE_ACCOUNT_JSON` — optional raw JSON string (preferred on Render)
+- `FIREBASE_PROJECT_ID`
 
-### 6. (Optional) Download Firebase service account key
+Edit `dashboard\.env` and set all `VITE_FIREBASE_*` values.
 
-1. Go to [Firebase Console](https://console.firebase.google.com/) → **stocker-5213e**
-2. **Project Settings** → **Service Accounts** → **Generate New Private Key**
-3. Save the file to `backend/serviceAccountKey.json`
-4. Set `FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json` in `backend/.env`
+### 6. Set Firebase service account file path
+
+Set this in `backend/.env` for local Windows usage:
+
+```env
+FIREBASE_SERVICE_ACCOUNT_PATH=D:\Downloads\stocker-5213e-firebase-adminsdk-xght3-c15166ea6b.json
+```
 
 ---
 
@@ -209,9 +216,21 @@ git push origin main
 
 ### 3. Set environment variables
 
-In the Render dashboard for the backend service:
-- `FIREBASE_SERVICE_ACCOUNT_PATH` — Upload your service account JSON and set the path
-- All other env vars are pre-configured in `render.yaml`
+In the Render dashboard, set these values manually:
+
+Backend service (`swastik-mcp-backend`)
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_SERVICE_ACCOUNT_JSON` (paste full service account JSON as one line)
+- `FIREBASE_SERVICE_ACCOUNT_PATH` (optional; only if you mount a key file path in Render)
+
+Dashboard service (`swastik-mcp-dashboard`)
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_MEASUREMENT_ID`
 
 ### 4. Verify
 
