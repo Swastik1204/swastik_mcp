@@ -20,6 +20,7 @@ backend/data/
 # ── Firebase service account key ────────────
 *-firebase-adminsdk-*.json
 serviceAccountKey.json
+firebase-key.json
 
 # ── OS files ────────────────────────────────
 .DS_Store
