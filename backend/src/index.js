@@ -18,7 +18,7 @@ const memoryRoutes = require('./routes/memory');
 const syncRoutes = require('./routes/sync');
 const toolRoutes = require('./routes/tools');
 const aiRoutes = require('./routes/ai');
-const { router: mcpRouter } = require('./mcp/server');
+const { router: mcpRouter, bootstrapMcp } = require('./mcp/server');
 
 // Middleware
 const { requireAuth } = require('./middleware/auth');
@@ -56,6 +56,7 @@ app.use('/api', apiLimiter);
 // ── Initialize backends ────────────────────────────────
 initFirebase();
 initSQLite();
+bootstrapMcp({ mode: 'HTTP', initializeBackends: false });
 
 // ── Public routes (no auth) ───────────────────────────
 app.use('/api/health', healthRoutes);

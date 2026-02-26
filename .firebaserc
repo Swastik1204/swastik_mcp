@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "stocker-5213e": {
+      "hosting": {
+        "swastikmcp": [
+          "swastikmcp"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
