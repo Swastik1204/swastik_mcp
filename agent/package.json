@@ -1,0 +1,13 @@
+{
+  "name": "swastik-mcp-agent",
+  "version": "1.0.0",
+  "description": "Swastik MCP — Local Device Agent",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "uuid": "^10.0.0"
+  }
+}

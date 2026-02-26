@@ -1,0 +1,56 @@
+# ================================================
+# render.yaml — Render Blueprint for Swastik MCP
+# ================================================
+# Deploy with: https://render.com/docs/blueprint-spec
+#
+# Steps to deploy:
+#   1. Push this repo to GitHub
+#   2. Go to https://dashboard.render.com/blueprints
+#   3. Click "New Blueprint Instance"
+#   4. Connect your GitHub repo (https://github.com/Swastik1204/swastik_mcp)
+#   5. Render will auto-detect this render.yaml and set up services
+#   6. Add environment variables in the Render dashboard
+
+services:
+  # ── MCP Backend API ───────────────────────────
+  - type: web
+    name: swastik-mcp-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: FIREBASE_PROJECT_ID
+        value: stocker-5213e
+      - key: FIREBASE_SERVICE_ACCOUNT_PATH
+        sync: false  # Set this manually in Render dashboard
+      # Upload your service account JSON to Render and set the path
+
+  # ── Dashboard (Static Site) ──────────────────
+  - type: web
+    name: swastik-mcp-dashboard
+    runtime: static
+    rootDir: dashboard
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: swastik-mcp-backend
+          type: web
+          property: host
