@@ -1,21 +1,34 @@
 import { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../services/firebase';
 
 /**
- * Mock login page.
- * Replace with Firebase Auth (signInWithEmailAndPassword) later.
+ * Login page with Firebase Auth (email/password).
  */
-export default function LoginPage({ onLogin }) {
+export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Mock: accept any non-empty credentials
-    if (email && password) {
-      onLogin({ email, uid: 'mock-uid-001' });
-    } else {
+    if (!email || !password) {
       setError('Please enter email and password');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged in App.jsx will pick up the user
+    } catch (err) {
+      const msg = err.code === 'auth/invalid-credential'
+        ? 'Invalid email or password'
+        : err.message;
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,11 +64,14 @@ export default function LoginPage({ onLogin }) {
 
             {error && <p className="text-error text-sm">{error}</p>}
 
-            <button type="submit" className="btn btn-primary w-full">Login</button>
+            <button type="submit" className={`btn btn-primary w-full ${loading ? 'loading' : ''}`}
+              disabled={loading}>
+              {loading ? 'Signing in…' : 'Login'}
+            </button>
           </form>
 
           <p className="text-xs text-center opacity-40 mt-4">
-            Mock login — any credentials accepted
+            Firebase Auth — email/password
           </p>
         </div>
       </div>

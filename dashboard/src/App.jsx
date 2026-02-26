@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './services/firebase';
 
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
@@ -11,23 +13,36 @@ import LogsPage from './pages/LogsPage';
 import ToolsPage from './pages/ToolsPage';
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(undefined); // undefined = loading
+  const [authChecked, setAuthChecked] = useState(false);
 
-  // Mock login — replace with Firebase Auth later
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      setAuthChecked(true);
+    });
+    return unsub;
+  }, []);
+
+  // Loading spinner while Firebase checks auth state
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-base-200">
+        <span className="loading loading-spinner loading-lg text-primary"></span>
+      </div>
+    );
+  }
+
   if (!user) {
-    return <LoginPage onLogin={(u) => setUser(u)} />;
+    return <LoginPage />;
   }
 
   return (
     <BrowserRouter>
       <div className="flex h-screen bg-base-200">
-        {/* Sidebar */}
         <Sidebar />
-
-        {/* Main content */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Navbar user={user} onLogout={() => setUser(null)} />
-
+          <Navbar user={user} onLogout={() => signOut(auth)} />
           <main className="flex-1 overflow-y-auto p-6">
             <Routes>
               <Route path="/" element={<Navigate to="/global-memory" />} />

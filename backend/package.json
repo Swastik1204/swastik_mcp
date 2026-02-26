@@ -8,17 +8,23 @@
     "dev": "nodemon src/index.js",
     "seed": "node scripts/seed.js"
   },
-  "keywords": ["mcp", "memory", "context", "protocol"],
+  "keywords": [
+    "mcp",
+    "memory",
+    "context",
+    "protocol"
+  ],
   "author": "Swastik",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^11.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.2.1",
     "firebase-admin": "^12.6.0",
-    "better-sqlite3": "^11.3.0",
-    "uuid": "^10.0.0",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"

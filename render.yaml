@@ -33,7 +33,10 @@ services:
         sync: false  # Set this manually in Render dashboard
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
-      # Upload your service account JSON to Render and set the path
+      - key: OWNER_UID
+        sync: false
+      - key: DEVICE_ID
+        value: render-backend
 
   # ── Dashboard (Static Site) ──────────────────
   - type: web
@@ -51,11 +54,11 @@ services:
         source: /*
         destination: /index.html
     envVars:
-      - key: VITE_API_URL
+      - key: VITE_API_BASE_URL
         fromService:
           name: swastik-mcp-backend
           type: web
-          property: host
+          envVarKey: RENDER_EXTERNAL_URL
       - key: VITE_FIREBASE_API_KEY
         sync: false
       - key: VITE_FIREBASE_AUTH_DOMAIN

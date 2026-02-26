@@ -1,12 +1,14 @@
 # ⚡ Swastik MCP — Personal MCP Brain
 
 A standalone **Model Context Protocol** (MCP) system with:
-- **Backend API** (Express.js) for memory CRUD, sync, tool registry, and AI routing
-- **Firebase Firestore** as cloud memory store
-- **SQLite** as local offline cache
-- **Two-way sync engine** (offline-first, push/pull when online)
-- **React dashboard** (Vite + TailwindCSS + daisyUI)
-- **Local device agent** for automated sync
+- **Backend API** (Express.js) — memory CRUD, tombstone delete/restore, sync, tool registry, AI routing
+- **Firebase Auth** — real authentication on backend + dashboard
+- **Firebase Firestore** — cloud memory store with tombstone fields
+- **SQLite** — offline cache with revision tracking + dead-letter queue
+- **Tombstone-aware sync engine** — incremental pull, revision wins, resurrection prevention
+- **MCP compatibility layer** — STDIO + HTTP transport for Claude Desktop / VS Code
+- **React dashboard** (Vite + TailwindCSS + daisyUI) — delete/restore UI, show-deleted toggle
+- **Local device agent** — automated sync
 
 ---
 
@@ -14,228 +16,201 @@ A standalone **Model Context Protocol** (MCP) system with:
 
 ```
 swastik_mcp/
-├── backend/               # Express.js API server
+├── backend/
 │   ├── src/
-│   │   ├── index.js       # Entry point
-│   │   ├── config/        # Firebase admin init
-│   │   ├── db/            # SQLite cache layer
-│   │   ├── routes/        # API routes (health, memory, sync, tools, ai)
-│   │   ├── sync/          # Two-way sync engine
-│   │   ├── services/      # Business logic (future)
-│   │   ├── middleware/    # Auth, logging (future)
-│   │   ├── tools/         # Tool implementations (future)
-│   │   └── ai/            # AI router logic (future)
-│   ├── data/              # SQLite database (gitignored)
-│   ├── package.json
+│   │   ├── index.js           # Entry point — CORS, auth, rate limiting
+│   │   ├── config/firebase.js # Firebase Admin SDK init
+│   │   ├── db/sqlite.js       # SQLite cache — tombstones, audit log, devices
+│   │   ├── middleware/
+│   │   │   ├── auth.js        # Firebase Auth token verification
+│   │   │   └── rateLimiter.js # express-rate-limit (100/min, 30/min writes)
+│   │   ├── routes/
+│   │   │   ├── health.js      # GET /api/health
+│   │   │   ├── memory.js      # CRUD + DELETE + RESTORE (global + project)
+│   │   │   ├── sync.js        # push, pull, status, retry-dead-letters
+│   │   │   ├── tools.js       # Tool registry (stubs)
+│   │   │   └── ai.js          # AI router (stubs)
+│   │   ├── sync/engine.js     # Tombstone-aware two-way sync
+│   │   └── mcp/server.js      # MCP protocol — HTTP router + STDIO transport
+│   ├── data/                  # SQLite database (gitignored)
 │   └── .env
-├── dashboard/             # Vite + React frontend
+├── dashboard/
 │   ├── src/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   ├── pages/         # GlobalMemory, ProjectMemory, Devices, Logs, Tools
-│   │   ├── components/    # Sidebar, Navbar
-│   │   └── services/      # Firebase client config, API helpers
-│   ├── index.html
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── package.json
-├── agent/                 # Local device agent
-│   ├── index.js
-│   └── package.json
-├── tools/                 # External tool integrations (future)
-├── docs/                  # Schema docs, architecture notes
-│   └── firestore-schema.md
-├── scripts/               # Utility scripts
-├── render.yaml            # Render deployment blueprint
-├── .env.example           # Template for environment variables
-├── .gitignore
+│   │   ├── App.jsx            # Firebase Auth state listener
+│   │   ├── pages/             # GlobalMemory, ProjectMemory, Devices, Logs, Tools
+│   │   ├── components/        # Sidebar, Navbar
+│   │   └── services/
+│   │       ├── firebase.js    # Firebase client config (env vars)
+│   │       └── api.js         # API helper with auth tokens
+│   └── .env
+├── agent/                     # Local device agent
+├── docs/firestore-schema.md   # Firestore schema with tombstone fields
+├── firebase.json              # Firebase Hosting config (SPA)
+├── render.yaml                # Render deployment blueprint
 └── README.md
 ```
 
 ---
 
-## 🚀 Local Setup (Windows PowerShell)
+## 🚀 Local Setup
 
 ### Prerequisites
-- **Node.js** ≥ 18 — [Download](https://nodejs.org/)
-- **Git** — [Download](https://git-scm.com/)
-- **Firebase project**
+- **Node.js** ≥ 18
+- **Firebase project** with Auth (email/password) enabled
+- **Firebase service account** key JSON
 
-### 1. Clone the repo
+### 1. Clone & install
 
 ```powershell
-cd "D:\My projects"
 git clone https://github.com/Swastik1204/swastik_mcp.git
 cd swastik_mcp
+cd backend; npm install; cd ..
+cd dashboard; npm install; cd ..
+cd agent; npm install; cd ..
 ```
 
-### 2. Install backend dependencies
+### 2. Configure environment
 
-```powershell
-cd backend
-npm install
-cd ..
-```
-
-### 3. Install dashboard dependencies
-
-```powershell
-cd dashboard
-npm install
-cd ..
-```
-
-### 4. Install agent dependencies
-
-```powershell
-cd agent
-npm install
-cd ..
-```
-
-### 5. Configure environment
-
-```powershell
-# Copy the example env file for the backend
-Copy-Item .env.example backend\.env
-
-# Copy dashboard env template
-Copy-Item dashboard\.env.example dashboard\.env
-```
-
-Edit `backend\.env` and set:
-- `FIREBASE_SERVICE_ACCOUNT_PATH` — path to your Firebase service account JSON
-- `FIREBASE_SERVICE_ACCOUNT_JSON` — optional raw JSON string (preferred on Render)
-- `FIREBASE_PROJECT_ID`
-
-Edit `dashboard\.env` and set all `VITE_FIREBASE_*` values.
-
-### 6. Set Firebase service account file path
-
-Set this in `backend/.env` for local Windows usage:
-
+**`backend/.env`**:
 ```env
-FIREBASE_SERVICE_ACCOUNT_PATH=D:\Downloads\stocker-5213e-firebase-adminsdk-xght3-c15166ea6b.json
+PORT=4000
+FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-key.json
+OWNER_UID=<your-firebase-auth-uid>
+DEVICE_ID=backend-local
 ```
+
+**`dashboard/.env`**: Set all `VITE_FIREBASE_*` values from your Firebase console.
+
+### 3. Create a Firebase Auth user
+
+Go to Firebase Console → Authentication → Add user. Copy the UID into `OWNER_UID`.
 
 ---
 
-## ▶️ Running the Backend
+## ▶️ Running
 
 ```powershell
-cd backend
-npm run dev     # Uses nodemon for auto-reload
+# Backend (port 4000)
+cd backend; npm run dev
+
+# Dashboard (port 5173, proxied to backend)
+cd dashboard; npm run dev
+
+# Agent (optional — automated sync loop)
+cd agent; npm start
 ```
-
-The API will be available at **http://localhost:4000**.
-
-### Key endpoints:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/memory/global` | List global memory |
-| POST | `/api/memory/global` | Set global memory `{ key, value }` |
-| GET | `/api/memory/project/:id` | List project memory |
-| POST | `/api/memory/project/:id` | Set project memory `{ key, value }` |
-| POST | `/api/sync/push` | Push offline queue to Firebase |
-| POST | `/api/sync/pull` | Pull cloud data to SQLite |
-| GET | `/api/sync/status` | Pending sync count |
-| GET | `/api/tools` | List registered tools |
-| POST | `/api/ai/route` | Route prompt to AI model (stub) |
 
 ---
 
-## ▶️ Running the Dashboard
+## 🔌 API Endpoints
 
-```powershell
-cd dashboard
-npm run dev
-```
+All routes except `/api/health` require a Firebase Auth `Bearer` token in the `Authorization` header.
 
-Open **http://localhost:5173** in your browser.
-
-- Login with any email/password (mock auth)
-- API calls are proxied to the backend on `:4000`
-
----
-
-## ▶️ Running the Agent
-
-```powershell
-cd agent
-npm start
-```
-
-The agent will:
-1. Check if the backend is online
-2. Push any queued offline writes
-3. Pull latest data from Firebase
-4. Repeat every 60 seconds (configurable via `SYNC_INTERVAL_MS`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/health` | No | Health check |
+| GET | `/api/memory/global` | Yes | List global memory (`?includeDeleted=true`) |
+| GET | `/api/memory/global/:key` | Yes | Get one entry |
+| POST | `/api/memory/global` | Yes | Set `{ key, value }` |
+| DELETE | `/api/memory/global/:key` | Owner | Tombstone delete |
+| POST | `/api/memory/global/:key/restore` | Owner | Restore tombstoned entry |
+| GET | `/api/memory/project/:id` | Yes | List project memory |
+| POST | `/api/memory/project/:id` | Yes | Set `{ key, value }` |
+| DELETE | `/api/memory/project/:id/:key` | Owner | Tombstone delete |
+| POST | `/api/memory/project/:id/:key/restore` | Owner | Restore |
+| POST | `/api/sync/push` | Yes | Push offline queue to Firebase |
+| POST | `/api/sync/pull` | Yes | Incremental pull (`?deviceId=`) |
+| GET | `/api/sync/status` | Yes | Queue depth + dead letters |
+| POST | `/api/sync/retry-dead-letters` | Owner | Retry dead-letter items |
+| GET | `/api/mcp/info` | Yes | MCP server info |
+| GET | `/api/mcp/tools` | Yes | List MCP tools |
+| POST | `/api/mcp/tools/call` | Yes | Call MCP tool `{ name, arguments }` |
 
 ---
 
-## 🔄 How Sync Works
+## 🧠 MCP Integration (Claude Desktop / VS Code)
+
+### STDIO Transport
+
+Add to `~/.config/claude/claude_desktop_config.json` (or VS Code MCP settings):
+
+```json
+{
+  "mcpServers": {
+    "swastik-brain": {
+      "command": "node",
+      "args": ["D:/My projects/swastik_mcp/backend/src/mcp/server.js", "--stdio"],
+      "env": {
+        "FIREBASE_SERVICE_ACCOUNT_PATH": "./firebase-key.json"
+      }
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `read_memory` | Read a key from global or project scope |
+| `write_memory` | Write/update a memory entry |
+| `delete_memory` | Tombstone-delete (reversible) |
+| `restore_memory` | Restore a tombstoned entry |
+| `list_memory` | List all keys in a scope |
+
+### MCP Resources
+
+| URI | Description |
+|-----|-------------|
+| `memory://global` | All global memory entries |
+| `memory://projects` | List of project IDs |
+| `memory://project/{id}` | All entries for a project |
+
+---
+
+## 🔄 Sync Architecture
 
 ```
 ┌─────────────┐     write      ┌─────────────┐     push      ┌──────────────┐
 │  Dashboard / │ ──────────────►│   SQLite     │ ────────────► │   Firebase   │
-│  API Client  │                │  (offline    │               │  (cloud      │
+│  MCP Client  │                │  (offline    │               │  (cloud      │
 │              │ ◄──────────────│   cache)     │ ◄──────────── │   store)     │
-└─────────────┘     read        └─────────────┘     pull       └──────────────┘
+└─────────────┘     read        └─────────────┘   inc. pull    └──────────────┘
 ```
 
-1. **Offline-first**: All writes go to SQLite immediately
-2. **Best-effort cloud write**: The API tries to write to Firebase; if it fails, the operation is added to `sync_queue`
-3. **Push**: `POST /api/sync/push` flushes `sync_queue` to Firebase
-4. **Pull**: `POST /api/sync/pull` downloads all Firebase data into SQLite
-5. **Agent**: The device agent automates push + pull on a timer
+### Key invariants:
+1. **Offline-first** — writes go to SQLite immediately, queued for Firebase
+2. **Revision wins** — higher revision number always overwrites lower
+3. **Tombstones propagate** — deleted entries propagate across devices, never resurrected by stale data
+4. **Incremental pull** — per-device `last_sync` cursor, only fetches changed docs
+5. **Dead-letter queue** — failed sync items (≥ 5 retries) are parked, retried manually
 
 ---
 
-## 🚀 Deploying to Render
+## 🔒 Security
 
-When you're ready to deploy:
+- **Authentication**: Firebase Auth ID tokens verified by backend middleware
+- **Authorization**: Delete/restore operations require `OWNER_UID` match
+- **CORS**: Locked to `swastikmcp.web.app`, `localhost:5173`, `localhost:4000`
+- **Rate limiting**: 100 req/min general, 30 req/min for writes
+- **Audit log**: All delete/restore operations logged in SQLite `audit_log` table + Firestore `logs` collection
+- **Tombstones**: Entries are never hard-deleted; tombstone flags allow forensic inspection and restoration
 
-### 1. Push to GitHub
+---
 
+## 🚀 Deploying
+
+### Firebase Hosting (Dashboard)
 ```powershell
-git add .
-git commit -m "Initial scaffold"
-git push origin main
+cd dashboard; npm run build; cd ..
+firebase deploy --only hosting
 ```
 
-### 2. Connect to Render
-
-1. Go to [render.com/blueprints](https://dashboard.render.com/blueprints)
-2. Click **New Blueprint Instance**
-3. Connect your GitHub repo: `https://github.com/Swastik1204/swastik_mcp`
-4. Render reads `render.yaml` and creates:
-   - **swastik-mcp-backend** — Node.js web service
-   - **swastik-mcp-dashboard** — Static site
-
-### 3. Set environment variables
-
-In the Render dashboard, set these values manually:
-
-Backend service (`swastik-mcp-backend`)
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_SERVICE_ACCOUNT_JSON` (paste full service account JSON as one line)
-- `FIREBASE_SERVICE_ACCOUNT_PATH` (optional; only if you mount a key file path in Render)
-
-Dashboard service (`swastik-mcp-dashboard`)
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `VITE_FIREBASE_MEASUREMENT_ID`
-
-### 4. Verify
-
-- Backend health: `https://swastik-mcp-backend.onrender.com/api/health`
-- Dashboard: `https://swastik-mcp-dashboard.onrender.com`
+### Render (Backend)
+1. Push to GitHub
+2. Connect repo at [render.com/blueprints](https://dashboard.render.com/blueprints)
+3. Set env vars: `FIREBASE_SERVICE_ACCOUNT_JSON`, `OWNER_UID`, `DEVICE_ID=render-backend`
+4. Set dashboard env vars: all `VITE_FIREBASE_*` + `VITE_API_BASE_URL`
 
 ---
 
@@ -243,14 +218,14 @@ Dashboard service (`swastik-mcp-dashboard`)
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Node.js, Express.js |
+| Backend | Node.js, Express.js, express-rate-limit |
 | Cloud DB | Firebase Firestore |
 | Local DB | SQLite (better-sqlite3) |
+| Auth | Firebase Auth (email/password) |
 | Frontend | React (Vite), TailwindCSS, daisyUI |
-| Auth | Firebase Auth (mock for now) |
+| MCP | Custom STDIO + HTTP server |
 | AI Router | Claude / ChatGPT / Gemini (stubs) |
-| Tools | Antigravity, Stitch (placeholders) |
-| Deploy | Render.com |
+| Deploy | Firebase Hosting + Render |
 
 ---
 
