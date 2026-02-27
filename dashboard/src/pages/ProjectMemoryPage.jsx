@@ -90,7 +90,11 @@ export default function ProjectMemoryPage() {
         <button type="submit" className="btn btn-primary btn-sm">Add</button>
       </form>
 
-      {status && <div className="alert alert-info mb-4 text-sm">{status}</div>}
+      {status && (
+        <div className={`alert ${status.startsWith('❌') || status.startsWith('Error') ? 'alert-error' : 'alert-success'} mb-4 text-sm`}>
+          {status}
+        </div>
+      )}
 
       {loading ? (
         <span className="loading loading-spinner loading-lg"></span>

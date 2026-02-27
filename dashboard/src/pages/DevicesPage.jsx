@@ -50,7 +50,11 @@ export default function DevicesPage() {
         <button className="btn btn-ghost btn-sm" onClick={fetchSyncStatus}>↻ Refresh</button>
       </div>
 
-      {actionStatus && <div className="alert alert-info mb-4 text-sm">{actionStatus}</div>}
+      {actionStatus && (
+        <div className={`alert ${actionStatus.startsWith('❌') || actionStatus.startsWith('Error') ? 'alert-error' : actionStatus.startsWith('✅') ? 'alert-success' : 'alert-info'} mb-4 text-sm`}>
+          {actionStatus}
+        </div>
+      )}
 
       <div className="stats shadow mb-6">
         <div className="stat">

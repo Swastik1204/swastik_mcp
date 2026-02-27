@@ -10,7 +10,7 @@ const links = [
 
 export default function Sidebar() {
   return (
-    <aside className="w-64 bg-base-300 p-4 flex flex-col">
+    <aside className="w-80 min-h-full bg-base-300 p-4 flex flex-col text-base-content">
       <h1 className="text-xl font-bold mb-6 px-2">⚡ Swastik MCP</h1>
 
       <ul className="menu menu-md gap-1 flex-1">

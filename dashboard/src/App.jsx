@@ -39,9 +39,10 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex h-screen bg-base-200">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="drawer lg:drawer-open h-screen bg-base-200">
+        <input id="main-drawer" type="checkbox" className="drawer-toggle" />
+        
+        <div className="drawer-content flex flex-col overflow-hidden">
           <Navbar user={user} onLogout={() => signOut(auth)} />
           <main className="flex-1 overflow-y-auto p-6">
             <Routes>
@@ -53,6 +54,11 @@ export default function App() {
               <Route path="/tools" element={<ToolsPage />} />
             </Routes>
           </main>
+        </div>
+
+        <div className="drawer-side z-40">
+          <label htmlFor="main-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
+          <Sidebar />
         </div>
       </div>
     </BrowserRouter>
