@@ -15,7 +15,7 @@ export default function LogsPage() {
       </div>
 
       <div className="mockup-code">
-        <pre data-prefix="1"><code>[INFO]  2026-02-26T10:00:00Z  Backend started on :4000</code></pre>
+        <pre data-prefix="1"><code>[INFO]  2026-02-26T10:00:00Z  Backend started on :3939</code></pre>
         <pre data-prefix="2"><code>[INFO]  2026-02-26T10:00:01Z  Firebase initialised</code></pre>
         <pre data-prefix="3"><code>[INFO]  2026-02-26T10:00:01Z  SQLite initialised</code></pre>
         <pre data-prefix="4" className="text-success"><code>[SYNC]  2026-02-26T10:01:00Z  Push complete: 3 synced, 0 failed</code></pre>

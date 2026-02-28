@@ -26,7 +26,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 4000
+        value: 3939
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_PATH
@@ -35,8 +35,53 @@ services:
         sync: false
       - key: OWNER_UID
         sync: false
+      - key: BACKEND_ADMIN_SECRET
+        sync: false
+      - key: TELEGRAM_ADMIN_CHAT_IDS
+        sync: false
+      - key: TELEGRAM_VIEWER_CHAT_IDS
+        sync: false
+      - key: TELEGRAM_ALLOWED_CHAT_IDS
+        sync: false
+      - key: TELEGRAM_OWNER_CHAT_ID
+        sync: false
+      - key: ALLOW_PROCESS_SELF_RESTART
+        value: true
       - key: DEVICE_ID
         value: render-backend
+      - key: AGENT_SECRET
+        sync: false  # Set this manually in Render dashboard (must match agent's AGENT_SECRET)
+
+  # ── Telegram Control Worker ─────────────────────────
+  - type: worker
+    name: swastik-mcp-telegram-bot
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: telegram
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: PUBLIC_API_BASE_URL
+        value: https://swastik-mcp-backend.onrender.com/api
+      - key: BACKEND_ADMIN_SECRET
+        sync: false
+      - key: TELEGRAM_ADMIN_CHAT_IDS
+        sync: false
+      - key: TELEGRAM_VIEWER_CHAT_IDS
+        sync: false
+      - key: TELEGRAM_ALLOWED_CHAT_IDS
+        sync: false
+      - key: TELEGRAM_OWNER_CHAT_ID
+        sync: false
+      - key: REQUEST_TIMEOUT_MS
+        value: 15000
+      - key: RATE_LIMIT_PER_CHAT_MS
+        value: 1200
 
   # ── Dashboard (Static Site) ──────────────────
   - type: web

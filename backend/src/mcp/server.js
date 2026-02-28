@@ -12,6 +12,7 @@ const { initSQLite, getDB } = require('../db/sqlite');
 const { initFirebase, getFirestore } = require('../config/firebase');
 const { getSyncStatus } = require('../sync/engine');
 const { MemoryServiceError, formatMcpError } = require('../services/memoryService');
+const { getMcpClientPermission } = require('../services/projectService');
 const { registerTools } = require('./tools/registerTools');
 
 const DEFAULT_DEVICE_ID = process.env.DEVICE_ID || 'mcp-server';
@@ -21,6 +22,9 @@ const runtimeState = {
   sqliteReady: false,
   firestoreReady: false,
   syncEngineReady: false,
+  lastToolCallAt: null,
+  lastToolCallDeviceId: null,
+  lastToolCallMode: null,
 };
 
 const SERVER_INFO = {
@@ -74,7 +78,21 @@ function buildContext({ uid, mode, source, deviceId }) {
     mode,
     source,
     deviceId: deviceId || DEFAULT_DEVICE_ID,
+    mcpClientId: null,
   };
+}
+
+const PERMISSION_LEVEL = {
+  'memory-only': 1,
+  'memory+project-metadata': 2,
+  'memory+project-files': 3,
+};
+
+function hasRequiredPermission(granted, required) {
+  if (!required) return true;
+  const grantedLevel = PERMISSION_LEVEL[granted] || 0;
+  const requiredLevel = PERMISSION_LEVEL[required] || 0;
+  return grantedLevel >= requiredLevel;
 }
 
 function toMcpError(error) {
@@ -98,10 +116,29 @@ function logToolCall(name, uid, success, message = '') {
   console.log(`[MCP] tool=${name} uid=${actor} status=${status}${tail}`);
 }
 
+function trackToolCall(context) {
+  runtimeState.lastToolCallAt = new Date().toISOString();
+  runtimeState.lastToolCallDeviceId = context?.deviceId || null;
+  runtimeState.lastToolCallMode = context?.mode || null;
+}
+
 async function executeTool(name, args, context) {
   const tool = toolRegistry.getTool(name);
   if (!tool) {
     throw new MemoryServiceError(404, 'TOOL_NOT_FOUND', `Unknown tool: ${name}`);
+  }
+
+  trackToolCall(context);
+
+  if (tool.requiredPermission && context.mcpClientId) {
+    const grantedPermission = getMcpClientPermission(context, context.mcpClientId);
+    if (!hasRequiredPermission(grantedPermission, tool.requiredPermission)) {
+      throw new MemoryServiceError(
+        403,
+        'INSUFFICIENT_PERMISSION_SCOPE',
+        `Tool requires ${tool.requiredPermission}, client has ${grantedPermission}`,
+      );
+    }
   }
 
   if (tool.ownerOnly) {
@@ -199,6 +236,30 @@ function getMcpHealth() {
     firestoreReady: runtimeState.firestoreReady,
     syncQueueDepth,
     deadLetters,
+    toolsRegistered: toolRegistry.listToolMetadata().length,
+    resourcesRegistered: RESOURCES.length,
+    lastToolCallAt: runtimeState.lastToolCallAt,
+    lastToolCallDeviceId: runtimeState.lastToolCallDeviceId,
+    lastToolCallMode: runtimeState.lastToolCallMode,
+  };
+}
+
+function getMcpDiagnostics() {
+  const isProd = process.env.NODE_ENV === 'production';
+  const port = Number(process.env.PORT || 3939);
+  const health = getMcpHealth();
+
+  return {
+    ok: true,
+    http: true,
+    stdio_supported: true,
+    tools_registered: health.toolsRegistered,
+    resources_registered: health.resourcesRegistered,
+    last_tool_call_at: health.lastToolCallAt,
+    last_tool_call_device_id: health.lastToolCallDeviceId,
+    last_tool_call_mode: health.lastToolCallMode,
+    port,
+    env: isProd ? 'prod' : 'local',
   };
 }
 
@@ -213,6 +274,10 @@ router.get('/info', (_req, res) => {
 
 router.get('/resources', (_req, res) => {
   res.json(RESOURCES);
+});
+
+router.get('/resources/list', (_req, res) => {
+  res.json({ resources: RESOURCES });
 });
 
 router.get('/tools', (_req, res) => {
@@ -237,6 +302,7 @@ router.post('/tools/call', async (req, res) => {
     source: 'mcp-http',
     deviceId: req.headers['x-device-id'] || DEFAULT_DEVICE_ID,
   });
+  context.mcpClientId = req.headers['x-mcp-client-id'] || req.body?.client_id || null;
 
   try {
     const payload = await executeTool(name, args, context);
@@ -258,6 +324,7 @@ router.post('/call_tool', async (req, res) => {
     source: 'mcp-http',
     deviceId: req.headers['x-device-id'] || DEFAULT_DEVICE_ID,
   });
+  context.mcpClientId = req.headers['x-mcp-client-id'] || req.body?.client_id || null;
 
   try {
     const payload = await executeTool(name, args, context);
@@ -317,12 +384,16 @@ function runStdio() {
       const toolName = params.name;
       const toolArgs = params.arguments || params.args || {};
       const callerUid = params.callerUid || params.uid || 'stdio-client';
+      const resolvedDeviceId = params.deviceId || DEFAULT_DEVICE_ID;
       const context = buildContext({
         uid: callerUid,
         mode: 'stdio',
         source: 'mcp-stdio',
-        deviceId: params.deviceId || DEFAULT_DEVICE_ID,
+        deviceId: resolvedDeviceId,
       });
+      context.mcpClientId = params.clientId || process.env.MCP_CLIENT_ID || null;
+
+      console.log(`[MCP][STDIO] device_id=${resolvedDeviceId} tool=${toolName}`);
 
       try {
         const payload = await executeTool(toolName, toolArgs, context);
@@ -375,5 +446,6 @@ module.exports = {
   RESOURCES,
   runStdio,
   getMcpHealth,
+  getMcpDiagnostics,
   bootstrapMcp,
 };

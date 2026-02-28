@@ -6,7 +6,7 @@
 
 import { auth } from './firebase';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3939/api').replace(/\/$/, '');
 
 async function getAuthHeaders() {
   const user = auth.currentUser;
@@ -61,6 +61,8 @@ export const retryDeadLetters = () => apiFetch('/sync/retry-dead-letters', { met
 // ── Health ─────────────────────────────────────────────
 
 export const healthCheck = () => apiFetch('/health');
+export const mcpHealthCheck = () => apiFetch('/health/mcp');
+export const telegramHealthCheck = () => apiFetch('/health/telegram');
 
 // ── Tools ──────────────────────────────────────────────
 
@@ -72,3 +74,56 @@ export const getMcpInfo = () => apiFetch('/mcp/info');
 export const getMcpTools = () => apiFetch('/mcp/tools');
 export const callMcpTool = (name, args) =>
   apiFetch('/mcp/tools/call', { method: 'POST', body: JSON.stringify({ name, arguments: args }) });
+
+// ── Projects ───────────────────────────────────────────
+
+export const listProjectsApi = () => apiFetch('/projects');
+export const getProjectApi = (id) => apiFetch(`/projects/${id}`);
+export const createProjectApi = (data) =>
+  apiFetch('/projects', { method: 'POST', body: JSON.stringify(data) });
+export const rescanProjectApi = (id) =>
+  apiFetch(`/projects/${id}/rescan`, { method: 'POST' });
+export const scanPreview = (local_path) =>
+  apiFetch('/projects/scan-preview', { method: 'POST', body: JSON.stringify({ local_path }) });
+export const validateGitHub = (data) =>
+  apiFetch('/projects/validate-github', { method: 'POST', body: JSON.stringify(data) });
+
+// ── MCP Clients ────────────────────────────────────────
+
+export const listMcpClients = () => apiFetch('/mcp/clients');
+export const getMcpClientApi = (id) => apiFetch(`/mcp/clients/${id}`);
+export const createMcpClientApi = (data) =>
+  apiFetch('/mcp/clients', { method: 'POST', body: JSON.stringify(data) });
+export const updateMcpClientApi = (id, data) =>
+  apiFetch(`/mcp/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const testMcpClientApi = (id) =>
+  apiFetch(`/mcp/clients/${id}/test`, { method: 'POST' });
+export const reconnectMcpClientApi = (id) =>
+  apiFetch(`/mcp/clients/${id}/reconnect`, { method: 'POST' });
+export const launchMcpClientApi = (id, action = 'launch') =>
+  apiFetch(`/mcp/clients/${id}/launch`, { method: 'POST', body: JSON.stringify({ action }) });
+export const getMcpClientMeta = () => apiFetch('/mcp/clients/meta');
+
+export const addFreeformMemoryApi = ({
+  text,
+  tags = [],
+  projectId,
+  importance = 'medium',
+  pinned = false,
+  key,
+}) => {
+  const memoryKey = key || `manual_${Date.now()}`;
+  const value = {
+    manual: true,
+    text,
+    tags,
+    importance,
+    pinned,
+    created_at: new Date().toISOString(),
+  };
+
+  if (projectId) {
+    return setProjectMemory(projectId, memoryKey, value);
+  }
+  return setGlobalMemory(memoryKey, value);
+};

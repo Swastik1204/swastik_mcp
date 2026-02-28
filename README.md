@@ -73,7 +73,7 @@ cd agent; npm install; cd ..
 
 **`backend/.env`**:
 ```env
-PORT=4000
+PORT=3939
 FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-key.json
 OWNER_UID=<your-firebase-auth-uid>
 DEVICE_ID=backend-local
@@ -90,7 +90,7 @@ Go to Firebase Console → Authentication → Add user. Copy the UID into `OWNER
 ## ▶️ Running
 
 ```powershell
-# Backend (port 4000)
+# Backend (port 3939)
 cd backend; npm run dev
 
 # Dashboard (port 5173, proxied to backend)
@@ -125,6 +125,13 @@ All routes except `/api/health` require a Firebase Auth `Bearer` token in the `A
 | GET | `/api/mcp/info` | Yes | MCP server info |
 | GET | `/api/mcp/tools` | Yes | List MCP tools |
 | POST | `/api/mcp/tools/call` | Yes | Call MCP tool `{ name, arguments }` |
+| POST | `/api/mcp/clients/:id/launch` | Yes | One-click MCP client setup helper (open app/folder/copy config) |
+| POST | `/api/mcp/clients/:id/reconnect` | Yes | Reconnect MCP client and re-test health |
+| GET | `/api/health/mcp` | No | MCP self-test + diagnostics payload |
+| GET | `/api/health/telegram` | No | Telegram control-bot health snapshot |
+| GET | `/api/admin/status` | Secret + allowed chat | Telegram-friendly backend/MCP/sync snapshot |
+| POST | `/api/admin/telegram/ping` | Secret + allowed chat | Mark bot heartbeat and last command |
+| POST | `/api/admin/restart-backend` | Secret + owner chat | Trigger safe backend restart/deploy hook |
 
 ---
 
@@ -157,6 +164,72 @@ Add to `~/.config/claude/claude_desktop_config.json` (or VS Code MCP settings):
 | `delete_memory` | Tombstone-delete (reversible) |
 | `restore_memory` | Restore a tombstoned entry |
 | `list_memory` | List all keys in a scope |
+| `list_memories_filtered` | Filter by project, tag, importance, deleted state |
+| `search_memories` | Free-text search across memory content |
+| `add_freeform_memory` | Add manual memory with tags/importance/pin metadata |
+| `visualize_memory_summary` | Counts by project/tag + recent edits + deleted count |
+
+---
+
+## ⚙️ One-Click MCP Setup
+
+The dashboard MCP wizard now supports one-click setup for:
+- Claude Desktop
+- VS Code MCP client
+- Continue
+- Cursor
+- ChatGPT MCP
+- Gemini MCP
+- Antigravity
+- Stitch
+- Generic MCP
+
+### Port and endpoint invariant
+
+- Local API base: `http://localhost:3939/api`
+- Local MCP endpoint: `http://localhost:3939/api/mcp`
+- Production API base: `https://<render-backend>.onrender.com/api`
+- Production MCP endpoint: `https://<render-backend>.onrender.com/api/mcp`
+
+Dashboard setup snippets use `VITE_API_BASE_URL`, with fallback to `http://localhost:3939/api`.
+
+### Safety behavior
+
+- The launcher can open your client app and config folder and attempt clipboard copy.
+- No automatic filesystem writes are performed.
+- You always paste configuration manually.
+
+### OS support notes
+
+- Windows: app/folder open via `start` / `explorer`, clipboard via `Set-Clipboard`
+- macOS: app/folder open via `open`, clipboard via `pbcopy`
+- Linux: app/folder open via `xdg-open`, clipboard via `xclip` if available
+- If auto-open fails, the API returns fallback instructions.
+
+---
+
+## 📝 Manual Memory
+
+The dashboard includes **Add Memory Manually**:
+- Free-form text entry
+- Optional tags
+- Scope selector (global or project)
+- Importance (`low` / `medium` / `high`)
+- Pin flag
+- Optional custom key (auto-generated if omitted)
+
+Writes reuse existing memory APIs and revision/sync semantics.
+
+---
+
+## 🧠 Brain View
+
+The dashboard includes a graph-based **Brain View**:
+- Nodes represent memory entries
+- Tag nodes connect related memories
+- Filters for project, tag, importance, deleted state
+- Search, zoom/pan, and hover preview
+- Detail panel supports edit/delete/restore (owner-only rules remain enforced by backend)
 
 ### MCP Resources
 
@@ -191,10 +264,101 @@ Add to `~/.config/claude/claude_desktop_config.json` (or VS Code MCP settings):
 
 - **Authentication**: Firebase Auth ID tokens verified by backend middleware
 - **Authorization**: Delete/restore operations require `OWNER_UID` match
-- **CORS**: Locked to `swastikmcp.web.app`, `localhost:5173`, `localhost:4000`
+- **CORS**: Locked to `swastikmcp.web.app`, `localhost:5173`, `localhost:3939`
 - **Rate limiting**: 100 req/min general, 30 req/min for writes
 - **Audit log**: All delete/restore operations logged in SQLite `audit_log` table + Firestore `logs` collection
 - **Tombstones**: Entries are never hard-deleted; tombstone flags allow forensic inspection and restoration
+
+---
+
+## 🤖 Telegram Wake + MCP Health
+
+### Bot runtime
+
+- Bot lives in `telegram/` and runs as a separate process (`npm run dev:telegram`)
+- Required env vars for bot:
+  - `TELEGRAM_BOT_TOKEN`
+  - `TELEGRAM_ALLOWED_CHAT_IDS`
+  - `TELEGRAM_OWNER_CHAT_ID`
+  - `BACKEND_HEALTH_URL` (e.g. `http://localhost:3939/api/health` or Render URL)
+  - `BACKEND_ADMIN_SECRET`
+
+### Supported Telegram commands
+
+- `start` / `wake` → wake backend via `GET /api/health`
+- `status` → full backend/MCP/sync summary
+- `mcp` → MCP health summary
+- `sync` → queue/dead-letter summary
+- `logs` → last 5 logs (owner-only)
+- `restart` → deploy hook restart (owner-only)
+- `help` → command list
+
+### Health payload contracts
+
+`GET /api/health/mcp`
+
+```json
+{
+  "ok": true,
+  "http": true,
+  "stdio_supported": true,
+  "tools_registered": 14,
+  "resources_registered": 3,
+  "last_tool_call_at": "2026-02-28T12:00:00.000Z",
+  "port": 3939,
+  "env": "local"
+}
+```
+
+`GET /api/health/telegram`
+
+```json
+{
+  "ok": true,
+  "bot_connected": true,
+  "last_ping_at": "2026-02-28T12:00:05.000Z",
+  "allowed_chat_ids": ["123456789"],
+  "can_restart_backend": true
+}
+```
+
+### End-to-end validation checklist
+
+#### Local
+
+1. Start backend on `3939`: `cd backend && npm run dev`
+2. Verify MCP health: `GET http://localhost:3939/api/health/mcp`
+3. Verify Telegram health: `GET http://localhost:3939/api/health/telegram`
+4. Connect Claude Desktop via HTTP MCP to `http://localhost:3939/api/mcp`
+5. Call any MCP tool and confirm `last_tool_call_at` updates
+6. Start telegram bot: `cd telegram && npm install && npm start`
+7. Send `status` and confirm response includes queue/dead-letter values
+
+#### Production (Render + Firebase Hosting)
+
+1. Allow Render backend to sleep
+2. Send Telegram `start` command (wake ping)
+3. Confirm Render backend becomes healthy
+4. Connect MCP client to `https://<render-service>.onrender.com/api/mcp`
+5. Run `read_memory` and verify dashboard health badges update
+6. Send `status`, `mcp`, and (owner-only) `restart`
+
+### Failure-mode handling
+
+- Bot up, backend down → bot returns `Wake failed` / `Status failed` without crashing
+- Backend up, MCP degraded → `/api/health/mcp` returns `ok` with degraded flags
+- Expired Firebase token (HTTP MCP) → request rejected by auth middleware
+- Unauthorized Telegram chat → rejected by `allowed_chat_ids`
+- Owner-only command from non-owner → rejected (`Forbidden`)
+- Render deploy hook failure → restart endpoint returns explicit error status
+- Misconfigured port (5173 vs 3939) → health endpoints reveal actual backend port
+- Telegram command spam → per-chat rate limiting in bot handler
+
+### Deployment notes
+
+- Render backend env: set `BACKEND_ADMIN_SECRET`, `TELEGRAM_ALLOWED_CHAT_IDS`, `TELEGRAM_OWNER_CHAT_ID`, optional `RENDER_DEPLOY_HOOK_URL`
+- Bot host: run `telegram/` in an always-on worker/runtime (not on sleeping web service)
+- Keep `ALLOW_PROCESS_SELF_RESTART=false` in production unless explicitly needed
 
 ---
 

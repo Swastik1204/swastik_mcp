@@ -29,6 +29,17 @@ async function requireAuth(req, res, next) {
 
   const idToken = authHeader.split('Bearer ')[1];
 
+  // ── Agent secret bypass ───────────────────────────────
+  // If AGENT_SECRET is set and the token matches, treat the caller as the
+  // owner so the local sync agent can reach auth-protected endpoints without
+  // a Firebase ID token.
+  const agentSecret = process.env.AGENT_SECRET;
+  if (agentSecret && idToken === agentSecret) {
+    const ownerUid = process.env.OWNER_UID || 'agent';
+    req.user = { uid: ownerUid, email: null, name: 'agent' };
+    return next();
+  }
+
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
     req.user = {

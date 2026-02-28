@@ -1,9 +1,11 @@
 const { registerMemoryTools } = require('./memoryTools');
 const { createFutureToolTemplate } = require('./futureToolTemplate');
+const { registerProjectTools } = require('./projectTools');
 
 function registerTools() {
   const tools = [
     ...registerMemoryTools(),
+    ...registerProjectTools(),
     createFutureToolTemplate(),
   ];
 

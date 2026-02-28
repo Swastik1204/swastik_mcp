@@ -20,17 +20,25 @@ const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 
 // ── Config ─────────────────────────────────────────────
-const API_BASE = process.env.MCP_API_URL || 'http://localhost:4000/api';
+const API_BASE = process.env.MCP_API_URL || 'http://localhost:3939/api';
 const SYNC_INTERVAL_MS = parseInt(process.env.SYNC_INTERVAL_MS, 10) || 60_000; // 1 min default
 const DEVICE_ID = process.env.DEVICE_ID || `device-${os.hostname()}-${uuidv4().slice(0, 8)}`;
+
+// Shared secret used to authenticate agent requests to the backend.
+// Must match the AGENT_SECRET env var set on the backend.
+const AGENT_SECRET = process.env.AGENT_SECRET || '';
 
 // ── Helpers ────────────────────────────────────────────
 
 async function apiCall(path, method = 'GET', body = null) {
   const url = `${API_BASE}${path}`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (AGENT_SECRET) {
+    headers['Authorization'] = `Bearer ${AGENT_SECRET}`;
+  }
   const opts = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
   };
   if (body) opts.body = JSON.stringify(body);
 
@@ -88,6 +96,7 @@ async function main() {
   console.log('╚══════════════════════════════════════════════╝');
   console.log(`   Device ID : ${DEVICE_ID}`);
   console.log(`   API Base  : ${API_BASE}`);
+  console.log(`   Auth      : ${AGENT_SECRET ? 'AGENT_SECRET set ✅' : 'no secret ⚠️  — set AGENT_SECRET in .env'}`);
   console.log(`   Interval  : ${SYNC_INTERVAL_MS}ms\n`);
 
   // 1. Health check

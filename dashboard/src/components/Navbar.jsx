@@ -1,4 +1,62 @@
+import { useEffect, useState, useRef } from 'react';
+import { mcpHealthCheck, telegramHealthCheck } from '../services/api';
+
+// Backoff intervals (ms): retry quickly at first, then slow down if backend is offline.
+// This avoids spamming ERR_CONNECTION_REFUSED in the console every 15 s.
+const POLL_ONLINE  = 15_000;   // poll every 15 s when backend is reachable
+const POLL_BACKOFF = [5_000, 10_000, 20_000, 40_000, 60_000]; // progressive backoff
+
 export default function Navbar({ user, onLogout }) {
+  const [brain, setBrain]         = useState(null);
+  const [telegram, setTelegram]   = useState(null);
+  const [offline, setOffline]     = useState(false);
+  const failCountRef              = useRef(0);
+  const timerRef                  = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        const [mcp, tg] = await Promise.allSettled([mcpHealthCheck(), telegramHealthCheck()]);
+        if (!mounted) return;
+
+        if (mcp.status === 'fulfilled') {
+          setBrain(mcp.value);
+        } else {
+          throw mcp.reason || new Error('MCP health fetch failed');
+        }
+
+        if (tg.status === 'fulfilled') {
+          setTelegram(tg.value);
+        } else {
+          setTelegram(null);
+        }
+
+        setOffline(false);
+        failCountRef.current = 0;
+        // Backend reachable — poll at normal cadence
+        timerRef.current = setTimeout(load, POLL_ONLINE);
+      } catch {
+        if (!mounted) return;
+        setBrain(null);
+        setTelegram(null);
+        failCountRef.current += 1;
+        const failures = failCountRef.current;
+        // After 2+ failures, mark offline and back off
+        if (failures >= 2) setOffline(true);
+        const delay = POLL_BACKOFF[Math.min(failures - 1, POLL_BACKOFF.length - 1)];
+        timerRef.current = setTimeout(load, delay);
+      }
+    }
+
+    load();
+    return () => {
+      mounted = false;
+      clearTimeout(timerRef.current);
+    };
+  }, []);
+
   return (
     <div className="navbar bg-base-100 shadow-sm px-4 lg:px-6">
       <div className="flex-none lg:hidden">
@@ -10,6 +68,27 @@ export default function Navbar({ user, onLogout }) {
         <span className="text-sm opacity-70 ml-2 lg:ml-0">MCP Dashboard</span>
       </div>
       <div className="flex-none gap-4">
+        <div className="hidden md:flex items-center gap-2 text-xs">
+          {offline ? (
+            <span className="badge badge-sm badge-error gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse inline-block" />
+              Backend offline
+            </span>
+          ) : (
+            <>
+              <span className={`badge badge-sm ${brain?.firestore ? 'badge-success' : 'badge-warning'}`}>
+                Firestore {brain?.firestore ? 'ok' : 'down'}
+              </span>
+              <span className={`badge badge-sm ${telegram?.bot_connected ? 'badge-success' : 'badge-warning'}`}>
+                Telegram {telegram?.bot_connected ? 'ok' : 'idle'}
+              </span>
+              <span className="badge badge-sm badge-outline">Queue {brain?.queueDepth ?? '-'}</span>
+              <span className={`badge badge-sm ${Number(brain?.deadLetters || 0) > 0 ? 'badge-error' : 'badge-success'}`}>
+                Dead {brain?.deadLetters ?? '-'}
+              </span>
+            </>
+          )}
+        </div>
         <label className="swap swap-rotate">
           <input type="checkbox" className="theme-controller" value="light" />
           {/* sun icon */}

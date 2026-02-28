@@ -1,0 +1,17 @@
+{
+  "name": "swastik-mcp",
+  "version": "1.0.0",
+  "description": "Swastik MCP Brain — monorepo root scripts",
+  "private": true,
+  "scripts": {
+    "setup":  "node scripts/oneClickSetup.js",
+    "doctor": "node scripts/devDoctor.js",
+    "dev:backend":  "cd backend && npm run dev",
+    "dev:dashboard": "cd dashboard && npm run dev",
+    "dev:telegram": "cd telegram && npm start",
+    "build":  "cd dashboard && npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
